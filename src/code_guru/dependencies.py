@@ -1,3 +1,4 @@
+from redis.asyncio import Redis
 from fastapi import Depends
 
 from code_guru.interfaces import (
@@ -5,10 +6,17 @@ from code_guru.interfaces import (
     GitHubServiceInterface,
 )
 from code_guru.services import CodeReviewService, GitHubService
+from database.base import redis
 
 
-def get_git_hub_service() -> GitHubServiceInterface:
-    return GitHubService()
+def get_redis() -> Redis:
+    return redis
+
+
+def get_git_hub_service(
+    redis: Redis = Depends(get_redis)
+) -> GitHubServiceInterface:
+    return GitHubService(redis=redis)
 
 
 def get_code_review_service(

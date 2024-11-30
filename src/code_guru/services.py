@@ -2,6 +2,7 @@ import base64
 import logging
 from typing import Optional
 
+from redis.asyncio import Redis
 from httpx import AsyncClient
 
 from code_guru.api_responses import get_github_response_content
@@ -41,6 +42,9 @@ class CodeReviewService(CodeReviewServiceInterface):
 
 
 class GitHubService(GitHubServiceInterface):
+    def __init__(self, redis: Redis):
+        self._redis = redis
+
     def get_api_url_from_usual_url(self, usual_url: str) -> str:
         username, repo_name = usual_url.rstrip("/").split("/")[-2:]
         repo_name = repo_name.removesuffix(".git")
@@ -52,17 +56,27 @@ class GitHubService(GitHubServiceInterface):
         url: str,
         parent_dir: Optional[str] = None
     ) -> dict[str, str]:
+        cache_key = f"files_info:{url}:{parent_dir}"
+        cached_content = await self._redis.get(cache_key)
+
+        if cached_content:
+            logger.info(f"Cache hit for {cache_key}")
+            return eval(cached_content)
+
         content = await get_github_response_content(
             client=client,
             url=url,
             logger=logger
         )
 
-        return await self._find_files_info(
+        files_info = await self._find_files_info(
             client=client,
             content=content,
             parent_dir=parent_dir
         )
+        await self._redis.set(cache_key, str(files_info))
+
+        return files_info
 
     async def _find_files_info(
         self, client: AsyncClient,
@@ -91,11 +105,16 @@ class GitHubService(GitHubServiceInterface):
 
         return files
 
-    @classmethod
     async def _get_file_content(
-        cls, client: AsyncClient,
+        self, client: AsyncClient,
         item_data: dict
     ) -> str:
+        cache_key = f"file_content:{item_data['url']}"
+        cached_content = await self._redis.get(cache_key)
+
+        if cached_content:
+            return cached_content
+
         file_data = await get_github_response_content(
             client=client,
             url=item_data["url"],
@@ -103,6 +122,9 @@ class GitHubService(GitHubServiceInterface):
         )
 
         try:
-            return base64.b64decode(file_data["content"]).decode("utf-8")
+            content = base64.b64decode(file_data["content"]).decode("utf-8")
         except UnicodeDecodeError:
-            return file_data["name"]
+            content = file_data["name"]
+
+        await self._redis.set(cache_key, content)
+        return content
