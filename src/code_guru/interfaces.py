@@ -24,3 +24,13 @@ class GitHubServiceInterface(ABC):
         url: str
     ) -> dict[str, str]:
         pass
+
+
+class GroqAIServiceInterface(ABC):
+    @abstractmethod
+    def get_bot_response(
+        self, assignment_description: str,
+        candidate_level: str,
+        files_info: dict[str, str]
+    ) -> str:
+        pass

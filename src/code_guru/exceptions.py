@@ -7,3 +7,7 @@ class BaseAPIException(Exception):
 
 class GitHubError(BaseAPIException):
     pass
+
+
+class ChatBotError(BaseAPIException):
+    pass

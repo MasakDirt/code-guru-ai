@@ -2,13 +2,16 @@ import base64
 import logging
 from typing import Optional
 
+from groq import APIStatusError, Groq
 from redis.asyncio import Redis
 from httpx import AsyncClient
 
 from code_guru.api_responses import get_github_response_content
+from code_guru.exceptions import ChatBotError
 from code_guru.interfaces import (
     CodeReviewServiceInterface,
     GitHubServiceInterface,
+    GroqAIServiceInterface,
 )
 from code_guru.schemas import CodeReviewRequest, CodeReviewResponse
 
@@ -17,8 +20,12 @@ logger = logging.getLogger("uvicorn.error")
 
 
 class CodeReviewService(CodeReviewServiceInterface):
-    def __init__(self, git_hub_service: GitHubServiceInterface):
+    def __init__(
+        self, git_hub_service: GitHubServiceInterface,
+        groq_ai_service: GroqAIServiceInterface
+    ):
         self._git_hub_service = git_hub_service
+        self._groq_ai_service = groq_ai_service
 
     async def review(
         self, code_review_request: CodeReviewRequest
@@ -34,10 +41,15 @@ class CodeReviewService(CodeReviewServiceInterface):
                 f"Got all files for -"
                 f" {code_review_request.github_repo_url}"
             )
+        review_result = self._groq_ai_service.get_bot_response(
+            assignment_description=code_review_request.assignment_description,
+            candidate_level=code_review_request.candidate_level,
+            files_info=files_info
+        )
 
         return CodeReviewResponse(
             filenames=files_info.keys(),
-            review_result=""
+            review_result=review_result
         )
 
 
@@ -128,3 +140,66 @@ class GitHubService(GitHubServiceInterface):
 
         await self._redis.set(cache_key, content)
         return content
+
+
+class GroqAIService(GroqAIServiceInterface):
+    def __init__(self, groq_api: Groq):
+        self._groq_api = groq_api
+
+    def get_bot_response(
+        self, assignment_description: str,
+        candidate_level: str,
+        files_info: dict[str, str]
+    ) -> str:
+        system_prompt = f"""
+        You are a professional Code Reviewer, tasked with reviewing code 
+        quality for a {candidate_level} developer. Users will provide you with:
+        1. An **assignment description** outlining the task requirements.
+        2. A dictionary containing the **content of files** in the format:
+           - `dict[filename: content, filename: content, ...]`.
+
+        Your job is to analyze the provided code and assignment description, 
+        then deliver a detailed, structured review.
+
+        Your response must follow this exact format:
+        1. **Downsides**:
+           - List and describe specific downsides or issues with the project 
+           (e.g., poor structure, lack of comments, security risks).
+        2. **Rating**:
+           - Provide an overall rating for the code, considering the expected 
+           level of a {candidate_level} developer (e.g., "Rating: 3/5").
+        3. **Thoughts**:
+           - Share your overall thoughts and suggestions on the repository, 
+           focusing on areas for improvement and strengths.
+
+        Be constructive and provide actionable feedback to help the developer 
+        improve. Ensure your feedback is specific and considers the provided 
+        code and its context.
+        """
+
+        user_prompt = f"""
+        1. Assigment description - {assignment_description}
+        2. Content of files - {files_info}
+        """
+
+        try:
+            completion = self._groq_api.chat.completions.create(
+                model="llama-3.1-70b-versatile",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ]
+            )
+        except APIStatusError as exc:
+            status = exc.status_code
+            message = exc.body["error"]["message"]
+            logger.error(
+                f"ChatBotAPI response error, status - {status} |"
+                f" message - '{message}'"
+            )
+            raise ChatBotError(
+                status_code=status,
+                message=message
+            )
+
+        return completion.choices[0].message.content
