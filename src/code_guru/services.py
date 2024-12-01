@@ -1,19 +1,20 @@
 import base64
 import logging
+import time
 from typing import Optional
 
 from groq import APIStatusError, Groq
-from redis.asyncio import Redis
 from httpx import AsyncClient
+from redis.asyncio import Redis
 
-from code_guru.api_responses import get_github_response_content
-from code_guru.exceptions import ChatBotError
+from code_guru.exceptions import ChatBotError, GitHubError
 from code_guru.interfaces import (
     CodeReviewServiceInterface,
     GitHubServiceInterface,
     GroqAIServiceInterface,
 )
 from code_guru.schemas import CodeReviewRequest, CodeReviewResponse
+from settings import GITHUB_API_TOKEN
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -63,11 +64,71 @@ class GitHubService(GitHubServiceInterface):
 
         return f"https://api.github.com/repos/{username}/{repo_name}/contents/"
 
+    async def _ensure_rate_limit(self) -> Optional[str]:
+        remaining = await self._redis.get("github_rate_remaining")
+        reset_time = await self._redis.get("github_rate_reset")
+        if remaining is not None and int(remaining) == 0:
+            sleep_time = int(reset_time) - int(time.time())
+            if sleep_time > 0:
+                message = (
+                    f"Rate limit exceeded. "
+                    f"Sleeping for {sleep_time} seconds."
+                )
+                logger.info(message)
+
+                return message
+
+    async def _get_github_response_content(
+        self, client: AsyncClient,
+        url: str
+    ) -> dict:
+        response = await client.get(
+            url=url,
+            headers={
+                "Authorization": f"Bearer {GITHUB_API_TOKEN}"
+            }
+        )
+        content = response.json()
+
+        if response.is_error:
+            status = int(content["status"])
+            message = content["message"]
+            logger.error(
+                f"GitHubAPI response error, status - {status} |"
+                f" message - '{message}' on url - {url}"
+            )
+            raise GitHubError(
+                status_code=status,
+                message=f"GitHub API error, detailed: '{message}'"
+            )
+
+        remaining = int(response.headers.get("X-RateLimit-Remaining", 0))
+        reset_time = int(
+            response.headers.get("X-RateLimit-Reset", time.time())
+        )
+
+        await self._redis.set(
+            "github_rate_remaining",
+            remaining,
+            ex=reset_time - int(time.time())
+        )
+        await self._redis.set(
+            "github_rate_reset",
+            reset_time,
+            ex=reset_time - int(time.time())
+        )
+
+        return content
+
     async def get_files_info(
         self, client: AsyncClient,
         url: str,
         parent_dir: Optional[str] = None
     ) -> dict[str, str]:
+        rate_limit_message = await self._ensure_rate_limit()
+        if rate_limit_message is not None:
+            return {"detail": rate_limit_message}
+
         cache_key = f"files_info:{url}:{parent_dir}"
         cached_content = await self._redis.get(cache_key)
 
@@ -75,10 +136,9 @@ class GitHubService(GitHubServiceInterface):
             logger.info(f"Cache hit for {cache_key}")
             return eval(cached_content)
 
-        content = await get_github_response_content(
+        content = await self._get_github_response_content(
             client=client,
-            url=url,
-            logger=logger
+            url=url
         )
 
         files_info = await self._find_files_info(
@@ -127,10 +187,9 @@ class GitHubService(GitHubServiceInterface):
         if cached_content:
             return cached_content
 
-        file_data = await get_github_response_content(
+        file_data = await self._get_github_response_content(
             client=client,
-            url=item_data["url"],
-            logger=logger
+            url=item_data["url"]
         )
 
         try:
