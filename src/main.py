@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from code_guru.router import router as code_guru_router
+from src.code_guru.router import router as code_guru_router
 
 
 app = FastAPI()

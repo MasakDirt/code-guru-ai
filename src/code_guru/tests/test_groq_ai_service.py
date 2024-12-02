@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 import pytest
 from groq import APIStatusError
 
-from code_guru.exceptions import ChatBotError
-from code_guru.services import GroqAIService
+from src.code_guru.exceptions import ChatBotError
+from src.code_guru.services import GroqAIService
 
 
 @pytest.fixture

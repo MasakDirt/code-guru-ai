@@ -7,14 +7,14 @@ from groq import APIStatusError, Groq
 from httpx import AsyncClient
 from redis.asyncio import Redis
 
-from code_guru.exceptions import ChatBotError, GitHubError
-from code_guru.interfaces import (
+from src.code_guru.exceptions import ChatBotError, GitHubError
+from src.code_guru.interfaces import (
     CodeReviewServiceInterface,
     GitHubServiceInterface,
     GroqAIServiceInterface,
 )
-from code_guru.schemas import CodeReviewRequest, CodeReviewResponse
-from settings import GITHUB_API_TOKEN
+from src.code_guru.schemas import CodeReviewRequest, CodeReviewResponse
+from src.settings import GITHUB_API_TOKEN
 
 
 logger = logging.getLogger("uvicorn.error")
