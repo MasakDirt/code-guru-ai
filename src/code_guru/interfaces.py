@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 
 from httpx import AsyncClient
 
-from code_guru.schemas import CodeReviewRequest, CodeReviewResponse
+from src.code_guru.schemas import CodeReviewRequest, CodeReviewResponse
 
 
 class CodeReviewServiceInterface(ABC):

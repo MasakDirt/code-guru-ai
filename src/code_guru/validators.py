@@ -1,6 +1,6 @@
 import re
 
-from settings import CANDIDATE_LEVELS
+from src.settings import CANDIDATE_LEVELS
 
 
 def validate_candidate_level(candidate_level: str) -> None:

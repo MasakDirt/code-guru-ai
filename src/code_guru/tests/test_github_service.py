@@ -4,7 +4,7 @@ import time
 import pytest
 from unittest.mock import AsyncMock
 from httpx import Response
-from code_guru.services import GitHubService, GitHubError
+from src.code_guru.services import GitHubService, GitHubError
 
 
 @pytest.fixture

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from code_guru.services import CodeReviewService
-from code_guru.schemas import CodeReviewRequest, CodeReviewResponse
+from src.code_guru.services import CodeReviewService
+from src.code_guru.schemas import CodeReviewRequest, CodeReviewResponse
 
 
 @pytest.fixture

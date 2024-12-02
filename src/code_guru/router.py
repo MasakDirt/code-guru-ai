@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from code_guru.controllers import code_review_controller
+from src.code_guru.controllers import code_review_controller
 
 
 router = APIRouter()

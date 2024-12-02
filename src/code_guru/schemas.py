@@ -1,6 +1,6 @@
 from pydantic import BaseModel, field_validator
 
-from code_guru.validators import (
+from src.code_guru.validators import (
     validate_candidate_level,
     validate_github_repo_url,
 )

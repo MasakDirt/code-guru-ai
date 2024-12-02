@@ -2,14 +2,18 @@ from fastapi import Depends
 from groq import Groq
 from redis.asyncio import Redis
 
-from code_guru.interfaces import (
+from src.code_guru.interfaces import (
     CodeReviewServiceInterface,
     GitHubServiceInterface,
     GroqAIServiceInterface,
 )
-from code_guru.services import CodeReviewService, GitHubService, GroqAIService
-from database.base import redis
-from groq_ai.api import groq_api
+from src.code_guru.services import (
+    CodeReviewService,
+    GitHubService,
+    GroqAIService,
+)
+from src.database.base import redis
+from src.groq_ai.api import groq_api
 
 
 def get_redis() -> Redis:

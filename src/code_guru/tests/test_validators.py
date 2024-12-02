@@ -1,6 +1,6 @@
 import pytest
 
-from code_guru.validators import (
+from src.code_guru.validators import (
     validate_candidate_level,
     validate_github_repo_url,
 )
@@ -15,7 +15,7 @@ CANDIDATE_LEVELS = {"junior", "mid", "senior", "lead"}
 )
 def test_validate_candidate_level_valid(candidate_level, monkeypatch):
     monkeypatch.setattr(
-        "code_guru.validators.CANDIDATE_LEVELS",
+        "src.code_guru.validators.CANDIDATE_LEVELS",
         CANDIDATE_LEVELS
     )
     validate_candidate_level(candidate_level)
@@ -27,7 +27,7 @@ def test_validate_candidate_level_valid(candidate_level, monkeypatch):
 )
 def test_validate_candidate_level_invalid(candidate_level, monkeypatch):
     monkeypatch.setattr(
-        "code_guru.validators.CANDIDATE_LEVELS",
+        "src.code_guru.validators.CANDIDATE_LEVELS",
         CANDIDATE_LEVELS
     )
 
